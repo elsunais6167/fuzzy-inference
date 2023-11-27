@@ -6,6 +6,8 @@ import tensorflow as tf
 from tensorflow import keras
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.optimize as opt
+
 # parameter class fis parameters
 
 
@@ -159,7 +161,49 @@ class ANFIS:
         intermediate_L2_output = intermediate_layer_model.predict(Xs)
 
         return intermediate_L2_output
+    
+    def fit_model(self, X, y, **kwargs):
+        # save initial weights in the ANFIS class
+        self.init_weights = self.model.get_layer('fuzzyLayer').get_weights()
 
+        # flatten the weights into a 1D array for differential evolution
+        initial_weights_flat = np.concatenate(
+            [w.flatten() for w in self.init_weights])
+
+        # define the objective function to minimize (negative log-likelihood)
+        def objective_function(weights_flat, X, y):
+            # reshape the flattened weights back to their original shapes
+            new_weights = [weights_flat[i:i + w.size].reshape(w.shape) for i, w in enumerate(self.init_weights)]
+            # update the model with the new weights
+            self.model.get_layer('fuzzyLayer').set_weights(new_weights)
+            # calculate the negative log-likelihood (you may need to adjust this based on your actual loss function)
+            loss = -np.sum(np.log(self.model.predict(X, batch_size=self.batch_size) + 1e-10) * y)
+            return loss
+
+        # perform differential evolution optimization
+        result = opt.differential_evolution(
+            objective_function,
+            bounds=[(-2, 2)] * len(initial_weights_flat),
+            args=(X, y),
+            strategy='best1bin',
+            maxiter=100,
+            popsize=10,
+            tol=1e-3,
+            mutation=(0.5, 1),
+            recombination=0.7,
+            seed=42,
+            **kwargs
+        )
+
+        # get the optimized weights and update the model
+        optimized_weights_flat = result.x
+        optimized_weights = [optimized_weights_flat[i:i + w.size].reshape(w.shape) for i, w in enumerate(self.init_weights)]
+        self.model.get_layer('fuzzyLayer').set_weights(optimized_weights)
+
+        # update the ANFIS class weights
+        self.update_weights()
+
+        return result
 
 # Custom weight initializer
 def equally_spaced_initializer(shape, minval=-1.5, maxval=1.5, dtype=tf.float32):
