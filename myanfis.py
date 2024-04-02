@@ -10,7 +10,6 @@ import scipy.optimize as opt
 
 # parameter class fis parameters
 
-
 class fis_parameters():
     def __init__(self, n_input: int = 3, n_memb: int = 3, batch_size: int = 16, n_epochs: int = 25, memb_func: str = 'gaussian', optimizer: str = 'sgd', loss: str = 'mse'):
         self.n_input = n_input  # no. of Regressors
